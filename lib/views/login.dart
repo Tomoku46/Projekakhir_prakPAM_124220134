@@ -7,7 +7,7 @@ import 'package:projekakhirpam_124220134/views/Profile.dart';
 import 'package:projekakhirpam_124220134/views/Signup.dart';
 import 'package:projekakhirpam_124220134/views/beranda.dart';
 
-
+import 'package:encrypt/encrypt.dart' as encrypt; // Import paket encrypt
 import '../SQLite/database_helper.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,8 +18,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  //Our controllers
-  //Controller is used to take the value from user and pass it to database
+  // Controllers
   final usrName = TextEditingController();
   final password = TextEditingController();
 
@@ -27,65 +26,105 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoginTrue = false;
 
   final db = DatabaseHelper();
-  //Login Method
-  //We will take the value of text fields using controllers in order to verify whether details are correct or not
-  login()async{
-    Users? usrDetails = await db.getUser(usrName.text);
-    var res = await db.authenticate(Users(usrName: usrName.text, password: password.text));
-    if(res == true){
-      //If result is correct then go to profile or home
-      if(!mounted)return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=> CalendarScreen(profile: usrDetails)));
-    }else{
-      //Otherwise show the error message
+
+  // Fungsi untuk mendekripsi password
+  String decryptPassword(String encryptedText) {
+  final key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1');
+  final parts = encryptedText.split(':');
+  if (parts.length != 2) throw Exception('Invalid encrypted format');
+
+  final iv = encrypt.IV.fromBase64(parts[0]);
+  final encrypted = encrypt.Encrypted.fromBase64(parts[1]);
+  final encrypter = encrypt.Encrypter(encrypt.AES(key));
+
+  return encrypter.decrypt(encrypted, iv: iv);
+}
+
+
+  // Login Method
+ login() async {
+  Users? usrDetails = await db.getUser(usrName.text);
+
+  if (usrDetails != null) {
+    // Dekripsi password yang disimpan di database
+    String decryptedPassword = decryptPassword(usrDetails.password);
+
+    // Bandingkan dengan password input pengguna
+    if (decryptedPassword == password.text) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => CalendarScreen(profile: usrDetails)),
+      );
+    } else {
       setState(() {
-        isLoginTrue = true;
+        isLoginTrue = true; // Password tidak cocok
       });
     }
+  } else {
+    setState(() {
+      isLoginTrue = true; // Username tidak ditemukan
+    });
   }
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       body: Center(
         child: SingleChildScrollView(
           child: SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-
-                //Because we don't have account, we must create one to authenticate
-                //lets go to sign up
-
-                const Text("LOGIN",style: TextStyle(color: primaryColor,fontSize: 40),),
+                const Text(
+                  "LOGIN",
+                  style: TextStyle(color: primaryColor, fontSize: 40),
+                ),
                 Image.asset("assets/upnLogo.png"),
-                InputField(hint: "Username", icon: Icons.account_circle, controller: usrName),
-                InputField(hint: "Password", icon: Icons.lock, controller: password,passwordInvisible: true),
-
-               
-
-                //Our login button
-                Button(label: "LOGIN", press: (){
-                login();
-
-                }),
-
+                InputField(
+                  hint: "Username",
+                  icon: Icons.account_circle,
+                  controller: usrName,
+                ),
+                InputField(
+                  hint: "Password",
+                  icon: Icons.lock,
+                  controller: password,
+                  passwordInvisible: true,
+                ),
+                Button(
+                  label: "LOGIN",
+                  press: () {
+                    login();
+                  },
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account?",style: TextStyle(color: Colors.grey),),
+                    const Text(
+                      "Don't have an account?",
+                      style: TextStyle(color: Colors.grey),
+                    ),
                     TextButton(
-                        onPressed: (){
-                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=> const SignupScreen()));
-                        },
-                        child: const Text("SIGN UP"))
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SignupScreen()),
+                        );
+                      },
+                      child: const Text("SIGN UP"),
+                    ),
                   ],
                 ),
-
-                 // Access denied message in case when your username and password is incorrect
-                //By default we must hide it
-                 //When login is not true then display the message
-                 isLoginTrue? Text("Username or password is incorrect",style: TextStyle(color: Colors.red.shade900),):const SizedBox(),
+                // Pesan kesalahan jika login gagal
+                isLoginTrue
+                    ? Text(
+                        "Username or password is incorrect",
+                        style: TextStyle(color: Colors.red.shade900),
+                      )
+                    : const SizedBox(),
               ],
             ),
           ),

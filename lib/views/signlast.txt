@@ -25,60 +25,43 @@ class _SignupScreenState extends State<SignupScreen> {
   final db = DatabaseHelper();
 
   // Fungsi untuk mengenkripsi password
- String encryptPassword(String plainText) {
-  try {
-    // Kunci AES 32 karakter
-    final key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1');
-    
-    // Buat IV baru untuk setiap proses enkripsi
-    final iv = encrypt.IV.fromLength(16); 
-    
-    // Buat encrypter AES
+  String encryptPassword(String plainText) {
+    final key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1'); // Panjang kunci harus 32 karakter
+    final iv = encrypt.IV.fromLength(16);
     final encrypter = encrypt.Encrypter(encrypt.AES(key));
-    
-    // Enkripsi teks
+
     final encrypted = encrypter.encrypt(plainText, iv: iv);
-
-    // Gabungkan IV dan teks terenkripsi dalam format "iv_base64:encrypted_base64"
-    return "${iv.base64}:${encrypted.base64}";
-  } catch (e) {
-    print("Encryption failed: $e");
-    return ""; // Return string kosong jika ada error
+    return encrypted.base64;
   }
-}
 
+  signUp() async {
+    if (password.text != confirmPassword.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match")),
+      );
+      return;
+    }
 
- signUp() async {
-  if (password.text != confirmPassword.text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Passwords do not match")),
+    // Enkripsi password sebelum disimpan
+    String encryptedPassword = encryptPassword(password.text);
+
+    var res = await db.createUser(
+      Users(
+        fullname: fullname.text,
+        email: email.text,
+        usrName: usrName.text,
+        password: encryptedPassword, // Simpan password terenkripsi
+      ),
     );
-    return;
+
+    if (res > 0) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
   }
-
-  // Enkripsi password
-  String encryptedPassword = encryptPassword(password.text);
-
-  // Simpan data pengguna
-  var res = await db.createUser(
-    Users(
-      fullname: fullname.text,
-      email: email.text,
-      usrName: usrName.text,
-      password: encryptedPassword, // Simpan password terenkripsi
-    ),
-  );
-
-  if (res > 0) {
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
-  }
-}
-
-
 
   @override
   Widget build(BuildContext context) {
